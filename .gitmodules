@@ -1,5 +1,4 @@
 [submodule "src/reach_ros_node"]
 	path = src/reach_ros_node
 	url = https://github.com/rpng/reach_ros_node.git
-[submodule "reach_ros_node/"]
 	branch = ros2
