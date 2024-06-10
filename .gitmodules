@@ -1,0 +1,9 @@
+[submodule "src/emlid_reach_ros"]
+	path = src/emlid_reach_ros
+	url = https://github.com/tmxkn1/emlid_reach_ros.git
+[submodule "src/nmea_msgs"]
+	path = src/nmea_msgs
+	url = https://github.com/tmxkn1/nmea_msgs.git
+[submodule "src/ros2_go2_video"]
+	path = src/ros2_go2_video
+	url = https://github.com/tfoldi/ros2_go2_video.git
