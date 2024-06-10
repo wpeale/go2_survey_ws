@@ -1,6 +1,3 @@
-[submodule "src/emlid_reach_ros"]
-	path = src/emlid_reach_ros
-	url = https://github.com/tmxkn1/emlid_reach_ros.git
-[submodule "src/nmea_msgs"]
-	path = src/nmea_msgs
-	url = https://github.com/tmxkn1/nmea_msgs.git
+[submodule "src/reach_ros_node"]
+	path = src/reach_ros_node
+	url = https://github.com/rpng/reach_ros_node.git
