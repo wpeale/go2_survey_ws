@@ -102,13 +102,13 @@ def generate_launch_description():
                 arguments=[urdf]
             ),
         )
-        urdf_launch_nodes.append(
+        """"urdf_launch_nodes.append(
             Node(
                 package='ros2_go2_video',
                 executable='ros2_go2_video',
                 parameters=[{'robot_ip': robot_ip_lst[i], 'robot_token': robot_token}],
             ),
-        )
+        )"""
 
         urdf_launch_nodes.append(
            Node(
