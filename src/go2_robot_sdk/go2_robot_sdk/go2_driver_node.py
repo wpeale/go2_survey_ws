@@ -42,7 +42,7 @@ from tf2_ros import TransformBroadcaster, TransformStamped
 from geometry_msgs.msg import Twist, TransformStamped, PoseStamped
 from go2_interfaces.msg import Go2State, IMU
 from unitree_go.msg import LowState
-from sensor_msgs.msg import PointCloud2, PointField, JointState, Joy
+from sensor_msgs.msg import PointCloud2, PointField, JointState, Joy, Imu
 from sensor_msgs_py import point_cloud2
 from std_msgs.msg import Header
 from nav_msgs.msg import Odometry
@@ -84,7 +84,7 @@ class RobotBaseNode(Node):
             self.go2_state_pub.append(self.create_publisher(Go2State, f'robot{i}/go2_states', qos_profile))
             self.go2_lidar_pub.append(self.create_publisher(PointCloud2, f'robot{i}/point_cloud2', qos_profile))
             self.go2_odometry_pub.append(self.create_publisher(Odometry, f'robot{i}/odom', qos_profile))
-            self.imu_pub.append(self.create_publisher(IMU, f'robot{i}/imu', qos_profile))
+            self.imu_pub.append(self.create_publisher(Imu, f'robot{i}/imu', qos_profile))
         
         self.broadcaster = TransformBroadcaster(self, qos=qos_profile)
 
@@ -365,12 +365,28 @@ class RobotBaseNode(Node):
                 go2_state.foot_speed_body = list(map(float, self.robot_sport_state[str(i)]["data"]["foot_speed_body"]))
                 self.go2_state_pub[i].publish(go2_state) 
 
-                imu = IMU()
-                imu.quaternion = list(map(float,self.robot_sport_state[str(i)]["data"]["imu_state"]["quaternion"]))
-                imu.accelerometer = list(map(float,self.robot_sport_state[str(i)]["data"]["imu_state"]["accelerometer"]))
-                imu.gyroscope = list(map(float,self.robot_sport_state[str(i)]["data"]["imu_state"]["gyroscope"]))
-                imu.rpy = list(map(float,self.robot_sport_state[str(i)]["data"]["imu_state"]["rpy"]))
-                imu.temperature = self.robot_sport_state[str(i)]["data"]["imu_state"]["temperature"]
+                #imu = IMU()
+                go2_quaternion = list(map(float,self.robot_sport_state[str(i)]["data"]["imu_state"]["quaternion"]))
+                go2_accelerometer = list(map(float,self.robot_sport_state[str(i)]["data"]["imu_state"]["accelerometer"]))
+                go2_gyroscope = list(map(float,self.robot_sport_state[str(i)]["data"]["imu_state"]["gyroscope"]))
+                go2_rpy = list(map(float,self.robot_sport_state[str(i)]["data"]["imu_state"]["rpy"]))
+                go2_temperature = self.robot_sport_state[str(i)]["data"]["imu_state"]["temperature"]
+
+                imu = Imu()
+                imu.orientation.x = go2_quaternion[0]
+                imu.orientation.y = go2_quaternion[1]
+                imu.orientation.z = go2_quaternion[2]
+                imu.orientation.w = go2_quaternion[3]
+
+                imu.linear_acceleration.x = go2_accelerometer[0]
+                imu.linear_acceleration.y = go2_accelerometer[1]
+                imu.linear_acceleration.z = go2_accelerometer[2]
+
+                imu.angular_velocity.x = go2_gyroscope[0]
+                imu.angular_velocity.y = go2_gyroscope[1]
+                imu.angular_velocity.z = go2_gyroscope[2]
+
+                
                 self.imu_pub[i].publish(imu) 
 
     async def run(self, conn, robot_num):
