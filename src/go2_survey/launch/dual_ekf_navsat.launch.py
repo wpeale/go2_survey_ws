@@ -28,7 +28,7 @@ def generate_launch_description():
     nav2_config = os.path.join(
         pkg_dir,
         "config",
-        "nav2_params.yaml"
+        "nav2_no_map_params.yaml"
     )
 
 

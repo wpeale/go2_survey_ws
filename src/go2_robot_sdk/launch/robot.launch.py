@@ -71,11 +71,11 @@ def generate_launch_description():
         get_package_share_directory('go2_robot_sdk'),
         'config', 'twist_mux.yaml')
     
-    foxglove_launch = os.path.join(
-        get_package_share_directory('foxglove_bridge'), 
-        'launch', 
-        'foxglove_bridge_launch.xml',
-    )
+    # foxglove_launch = os.path.join(
+    #     get_package_share_directory('foxglove_bridge'), 
+    #     'launch', 
+    #     'foxglove_bridge_launch.xml',
+    # )
 
     # TODO Need to fix Nav2
     # slam_toolbox_config = os.path.join(
@@ -166,9 +166,9 @@ def generate_launch_description():
             remappings=[('/cmd_vel_out', 'robot0/cmd_vel')]
         ),
 
-        IncludeLaunchDescription(
-            FrontendLaunchDescriptionSource(foxglove_launch)
-        ),
+        # IncludeLaunchDescription(
+        #     FrontendLaunchDescriptionSource(foxglove_launch)
+        # ),
 
 
         # TODO Need to fix Nav2

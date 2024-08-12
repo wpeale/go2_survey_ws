@@ -68,7 +68,7 @@ def gen_mov_command(x: float, y: float, z: float):
                 {
                     "x": x, 
                     "y": y, 
-                    "z": z
+                    "z": z,
                 })
                 
             }

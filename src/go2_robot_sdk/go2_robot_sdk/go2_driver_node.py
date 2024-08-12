@@ -1,4 +1,4 @@
-# Copyright (c) 2024, RoboVerse community
+## Copyright (c) 2024, RoboVerse community
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -27,6 +27,7 @@ import logging
 import os
 import threading
 import asyncio
+import numpy as np
 
 from scripts.go2_constants import ROBOT_CMD, RTC_TOPIC
 from scripts.go2_func import gen_command, gen_mov_command
@@ -39,13 +40,17 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile
 
 from tf2_ros import TransformBroadcaster, TransformStamped
+
+from std_msgs.msg import Header
 from geometry_msgs.msg import Twist, TransformStamped, PoseStamped
-from go2_interfaces.msg import Go2State, IMU
-from unitree_go.msg import LowState
 from sensor_msgs.msg import PointCloud2, PointField, JointState, Joy, Imu
 from sensor_msgs_py import point_cloud2
-from std_msgs.msg import Header
 from nav_msgs.msg import Odometry
+
+from std_srvs.srv import Empty
+
+from go2_interfaces.msg import Go2State, IMU
+from unitree_go.msg import LowState
 
 
 logging.basicConfig(level=logging.WARN)
@@ -79,6 +84,9 @@ class RobotBaseNode(Node):
         self.go2_odometry_pub = []
         self.imu_pub = []
 
+        self.should_sit = False
+        self.should_stand = False
+
         for i in range(len(self.robot_ip_lst)):
             self.joint_pub.append(self.create_publisher(JointState, f'robot{i}/joint_states', qos_profile))
             self.go2_state_pub.append(self.create_publisher(Go2State, f'robot{i}/go2_states', qos_profile))
@@ -86,7 +94,7 @@ class RobotBaseNode(Node):
             self.go2_odometry_pub.append(self.create_publisher(Odometry, f'robot{i}/odom', qos_profile))
             self.imu_pub.append(self.create_publisher(Imu, f'robot{i}/imu', qos_profile))
         
-        self.broadcaster = TransformBroadcaster(self, qos=qos_profile)
+        #self.broadcaster = TransformBroadcaster(self, qos=qos_profile)
 
         self.robot_cmd_vel = {}
         self.robot_odom = {}
@@ -102,7 +110,11 @@ class RobotBaseNode(Node):
                 f'robot{str(i)}/cmd_vel',
                 lambda msg: self.cmd_vel_cb(msg, str(i)),
                 qos_profile)
-                    
+
+        for i in range(len(self.robot_ip_lst)):
+            self.create_service(Empty, f"robot{str(i)}/stand", lambda x,y: self.stand_callback(str(i), x, y))
+            self.create_service(Empty, f"robot{str(i)}/sit", lambda x,y: self.prone_callback(str(i), x, y))
+            
         self.create_subscription(
             Joy,
             'joy',
@@ -132,9 +144,21 @@ class RobotBaseNode(Node):
         self.timer = self.create_timer(0.1, self.timer_callback)
         self.timer_lidar = self.create_timer(0.5, self.timer_callback_lidar)
 
+    def stand_callback(self, robot_num, request, response):
+        #stand_up_cmd = gen_command(ROBOT_CMD["StandUp"])
+        #self.conn[robot_num].data_channel.send(stand_up_cmd)
+        self.should_stand = True
+        return response
+    
+    def prone_callback(self, robot_num, request, response):
+        #prone_cmd = gen_command(ROBOT_CMD["StandDown"])
+        #self.conn[robot_num].data_channel.send(prone_cmd)
+        self.should_sit = True
+        return response
+        
     def timer_callback(self):
         if self.conn_type == 'webrtc':
-            self.publish_odom_webrtc()
+            #self.publish_odom_webrtc()
             self.publish_odom_topic_webrtc()
             self.publish_robot_state_webrtc()
             self.publish_joint_state_webrtc()
@@ -146,7 +170,7 @@ class RobotBaseNode(Node):
     def cmd_vel_cb(self, msg, robot_num):
         x = msg.linear.x
         y = msg.linear.y
-        z = msg.linear.z
+        z = msg.angular.z
 
         if x > 0.0 or y > 0.0 or z != 0.0:
             self.robot_cmd_vel[robot_num] = gen_mov_command(round(x, 2), round(y, 2), round(z, 2))
@@ -198,17 +222,19 @@ class RobotBaseNode(Node):
                 self.conn[robot_num].data_channel.send(self.robot_cmd_vel[robot_num])
                 self.robot_cmd_vel[robot_num] = None
 
-            if robot_num in self.conn and self.joy_state.buttons and self.joy_state.buttons[1]:
+            if robot_num in self.conn and self.should_sit:
                 self.get_logger().info("Stand down")
                 stand_down_cmd = gen_command(ROBOT_CMD["StandDown"])
                 self.conn[robot_num].data_channel.send(stand_down_cmd)
+                self.should_sit = False
 
-            if robot_num in self.conn and self.joy_state.buttons and self.joy_state.buttons[0]:
+            if robot_num in self.conn and self.should_stand:
                 self.get_logger().info("Stand up")
                 stand_up_cmd = gen_command(ROBOT_CMD["StandUp"])
                 self.conn[robot_num].data_channel.send(stand_up_cmd)
                 move_cmd = gen_command(ROBOT_CMD['BalanceStand'])
                 self.conn[robot_num].data_channel.send(move_cmd)
+                self.should_stand = False
 
     def on_validated(self, robot_num):
         if robot_num in self.conn:
@@ -248,31 +274,74 @@ class RobotBaseNode(Node):
     def publish_odom_topic_webrtc(self):
         for i in range(len(self.robot_odom)):
             if self.robot_odom[str(i)]:
-                odom_msg = Odometry()
-                odom_msg.header.stamp = self.get_clock().now().to_msg()
-                odom_msg.header.frame_id = 'odom'
-                odom_msg.child_frame_id = f"robot{str(i)}/base_link"
-                odom_msg.pose.pose.position.x = self.robot_odom[str(i)]['data']['pose']['position']['x']
-                odom_msg.pose.pose.position.y = self.robot_odom[str(i)]['data']['pose']['position']['y']
-                odom_msg.pose.pose.position.z = self.robot_odom[str(i)]['data']['pose']['position']['z'] + 0.07
-                odom_msg.pose.pose.orientation.x = self.robot_odom[str(i)]['data']['pose']['orientation']['x']
-                odom_msg.pose.pose.orientation.y = self.robot_odom[str(i)]['data']['pose']['orientation']['y']
-                odom_msg.pose.pose.orientation.z = self.robot_odom[str(i)]['data']['pose']['orientation']['z']
-                odom_msg.pose.pose.orientation.w = self.robot_odom[str(i)]['data']['pose']['orientation']['w']
-                self.go2_odometry_pub[i].publish(odom_msg)
+                try:
+                    odom_msg = Odometry()
+                    odom_msg.header.stamp = self.get_clock().now().to_msg()
+                    odom_msg.header.frame_id = 'odom'
+                    odom_msg.child_frame_id = f"robot{str(i)}/base_link"
+                    odom_msg.pose.pose.position.x = self.robot_odom[str(i)]['data']['pose']['position']['x']
+                    odom_msg.pose.pose.position.y = self.robot_odom[str(i)]['data']['pose']['position']['y']
+                    odom_msg.pose.pose.position.z = self.robot_odom[str(i)]['data']['pose']['position']['z'] + 0.07
+                    odom_msg.pose.pose.orientation.x = self.robot_odom[str(i)]['data']['pose']['orientation']['x']
+                    odom_msg.pose.pose.orientation.y = self.robot_odom[str(i)]['data']['pose']['orientation']['y']
+                    odom_msg.pose.pose.orientation.z = self.robot_odom[str(i)]['data']['pose']['orientation']['z']
+                    odom_msg.pose.pose.orientation.w = self.robot_odom[str(i)]['data']['pose']['orientation']['w']
+
+                    odom_msg.pose.covariance = [0.001, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                                0.0, 0.001, 0.0, 0.0, 0.0, 0.0,
+                                                0.0, 0.0, 1000000.0, 0.0, 0.0, 0.0,
+                                                0.0, 0.0, 0.0, 1000000.0, 0.0, 0.0,
+                                                0.0, 0.0, 0.0, 0.0, 1000000.0, 0.0,
+                                                0.0, 0.0, 0.0, 0.0, 0.0, 0.001]
+                    
+                    
+                    # odom_msg.pose.covariance = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                    #                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                    #                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                    #                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                    #                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                    #                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+                    
+                    
+                    odom_msg.twist.covariance = [0.001, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                                 0.0, 0.001, 0.0, 0.0, 0.0, 0.0,
+                                                 0.0, 0.0, 1000000.0, 0.0, 0.0, 0.0,
+                                                 0.0, 0.0, 0.0, 1000000.0, 0.0, 0.0,
+                                                 0.0, 0.0, 0.0, 0.0, 1000000.0, 0.0,
+                                                 0.0, 0.0, 0.0, 0.0, 0.0, 1000.0]
+                    
+                    # odom_msg.twist.covariance = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                    #                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                    #                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                    #                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                    #                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                    #                             0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+                    
+
+                    self.go2_odometry_pub[i].publish(odom_msg)
+                except:
+                    self.get_logger().info("odom issue")
+                    pass
 
     def publish_lidar_webrtc(self):
         for i in range(len(self.robot_lidar)):
             if self.robot_lidar[str(i)]:
+                origin = [self.robot_odom[str(i)]['data']['pose']['position']['x'],
+                          self.robot_odom[str(i)]['data']['pose']['position']['y'],
+                          self.robot_odom[str(i)]['data']['pose']['position']['z'] + 0.07]
+
+                yaw = list(map(float,self.robot_sport_state[str(i)]["data"]["imu_state"]["rpy"]))[2]
+
                 points = update_meshes_for_cloud2(
                     self.robot_lidar[str(i)]["decoded_data"]["positions"], 
                     self.robot_lidar[str(i)]["decoded_data"]["uvs"], 
                     self.robot_lidar[str(i)]['data']['resolution'], 
-                    self.robot_lidar[str(i)]['data']['origin'],
+                    self.robot_lidar[str(i)]['data']['origin'] - np.array(origin),
+                    -yaw,
                     0
                     )
                 point_cloud = PointCloud2()
-                point_cloud.header = Header(frame_id="odom")
+                point_cloud.header = Header(frame_id=f"robot{str(i)}/base_link")
                 point_cloud.header.stamp = self.get_clock().now().to_msg()
                 fields = [
                     PointField(name='x', offset=0, datatype=PointField.FLOAT32, count=1),
@@ -281,6 +350,7 @@ class RobotBaseNode(Node):
                     PointField(name='intensity', offset=12, datatype=PointField.FLOAT32, count=1),
                 ]
                 point_cloud = point_cloud2.create_cloud(point_cloud.header, fields, points)
+                print("publishing")
                 self.go2_lidar_pub[i].publish(point_cloud)
 
     def publish_joint_state_webrtc(self): 

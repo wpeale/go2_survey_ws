@@ -1,0 +1,19 @@
+survey_mission:
+  grid_spacing: 5.0
+  offset: 0.0
+  alignment_dir: "north"
+  vertices:
+    - easting: 566372.0
+      northing: 4194245.0 
+    - easting: 566421.0
+      northing: 4194257.0 
+    - easting: 566422.0 
+      northing: 4194198.0 
+    # - easting: 547773.0
+    #   northing: 4223852.0 
+    # - easting: 547788.0
+    #   northing: 4223890.0 
+    # - easting: 547736.0 
+    #   northing: 4223928.0 
+    # - easting: 547716.0 
+    #   northing: 4223894.0

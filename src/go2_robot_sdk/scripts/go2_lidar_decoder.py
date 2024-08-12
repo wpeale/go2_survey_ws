@@ -31,7 +31,7 @@ from wasmtime import ValType
 from ament_index_python import get_package_share_directory
 
 
-def update_meshes_for_cloud2(positions, uvs, res, origin, intense_limiter):
+def update_meshes_for_cloud2(positions, uvs, res, origin, theta, intense_limiter):
     # Convert the list of positions to a NumPy array for vectorized operations
     position_array = np.array(positions).reshape(-1, 3).astype(np.float32)
 
@@ -41,6 +41,11 @@ def update_meshes_for_cloud2(positions, uvs, res, origin, intense_limiter):
     # Recalculate origin
     position_array += origin
 
+    rot = np.array([[np.cos(theta), np.sin(theta), 0],
+                    [-np.sin(theta), np.cos(theta), 0],
+                    [0, 0, 1]])
+    position_array = np.matmul(position_array, rot)
+    
     # Convert the list of uvs to a NumPy array
     uv_array = np.array(uvs, dtype=np.float32).reshape(-1, 2)
 

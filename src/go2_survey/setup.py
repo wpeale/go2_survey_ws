@@ -1,14 +1,17 @@
 import os
 from glob import glob
 from setuptools import setup
+from setuptools import find_packages
 
 package_name = 'go2_survey'
+k30_submodule = 'go2_survey/k30'
+planning_submodule = 'go2_survey/planning_utils'
 
 setup(
     name=package_name,
     version='0.0.0',
     # Packages to export
-    packages=[package_name],
+    packages=[package_name, k30_submodule, planning_submodule],
     # Files we want to install, specifically launch files
     data_files=[
         # Install marker file in the package index
@@ -39,7 +42,8 @@ setup(
     # scripts here.
     entry_points={
         'console_scripts': [
-            'my_script = my_package.my_script:main'
+            'co2_survey_node = go2_survey.co2_survey_node:main',
+            'flux_survey_logger_node = go2_survey.flux_survey_logger_node:main'
         ],
     },
 )
