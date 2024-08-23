@@ -43,7 +43,8 @@ setup(
     entry_points={
         'console_scripts': [
             'co2_survey_node = go2_survey.co2_survey_node:main',
-            'flux_survey_logger_node = go2_survey.flux_survey_logger_node:main'
+            'flux_survey_logger_node = go2_survey.flux_survey_logger_node:main',
+            'begin_survey = go2_survey.begin_survey:main'
         ],
     },
 )

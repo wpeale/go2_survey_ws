@@ -12,13 +12,15 @@ MAP_FRAME = "map"
 
 class SurveyMissionPlanner:
     """
-    Plans a survey mission based on params in a yaml file
+    Plans a survey mission based on provided parameters.
     """
 
-    def __init__(self, mission_file_path: str) -> None:
-        with open(mission_file_path, "r") as mission_file:
-            self._param_dict = yaml.safe_load(mission_file)["survey_mission"]
-
+    def __init__(self, vertices, grid_spacing=1.0, offset=0.0, north_aligned=True) -> None:
+        self._vertices = vertices
+        self._grid_spacing = grid_spacing
+        self._offset = offset
+        self._north_aligned = north_aligned
+        
     def get_survey_area_polygon(self, tf_buffer):
         map_vertices = self._get_map_vertices(tf_buffer)
         poly_stamped = PolygonStamped()
@@ -35,19 +37,13 @@ class SurveyMissionPlanner:
             current_position,
             self._grid_spacing,
             self._offset,
-            self._alignment_dir,
+            self._north_aligned,
         )
         path_msg = self._generate_path_msg(route)
         return path_msg
 
     def _get_map_vertices(self, tf_buffer):
-        vertices = []
-        for vertex in self._param_dict["vertices"]:
-            easting, northing = vertex["easting"], vertex["northing"]
-            pt = Point(x=easting, y=northing, z=0.0)
-            vertices.append(pt)
-
-        map_vertices = self._transform_vertices(tf_buffer, vertices)
+        map_vertices = self._transform_vertices(tf_buffer, self._vertices)
         return map_vertices
 
     def _transform_vertices(self, tf_buffer, vertices):
@@ -77,19 +73,6 @@ class SurveyMissionPlanner:
         # Set the frame and stamp, then publish
         path_msg.header.frame_id = "map"
         return path_msg
-
-    @property
-    def _grid_spacing(self):
-        return self._param_dict["grid_spacing"]
-
-    @property
-    def _offset(self):
-        return self._param_dict["offset"]
-
-    @property
-    def _alignment_dir(self):
-        return self._param_dict["alignment_dir"]
-
 
 def _point_to_point32(point):
     point32 = Point32()

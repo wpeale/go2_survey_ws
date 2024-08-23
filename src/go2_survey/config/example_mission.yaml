@@ -1,0 +1,12 @@
+survey_mission:
+  grid_spacing: 5.0
+  offset: 0.0
+  north_aligned: true
+  sample_time: 30.0
+  vertices:
+    - easting: 566372.0
+      northing: 4194245.0 
+    - easting: 566421.0
+      northing: 4194257.0 
+    - easting: 566422.0 
+      northing: 4194198.0

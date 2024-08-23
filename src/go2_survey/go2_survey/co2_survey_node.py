@@ -7,7 +7,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionServer, CancelResponse, GoalResponse
 
-from geometry_msgs.msg import PolygonStamped
+from geometry_msgs.msg import PolygonStamped, Point
 from nav_msgs.msg import Path
 
 from std_srvs.srv import Empty, SetBool
@@ -29,16 +29,10 @@ VEHICLE_FRAME = "robot0/base_link"
 
 SURVEY_UPDATE_RATE = 1.0
 
-DWELL_TIME = 30.0
-
 
 class CO2SurveyNode(Node):
     def __init__(self, mission_file_path):
         super().__init__("co2_survey_node")
-
-        self._mission_planner = survey_mission_planner.SurveyMissionPlanner(
-            mission_file_path
-        )
 
         self._tf_buffer = Buffer()
         self._tf_listener = TransformListener(self._tf_buffer, self)
@@ -51,66 +45,82 @@ class CO2SurveyNode(Node):
         self._path_publisher = self.create_publisher(Path, "survey_path", 10)
 
         self._go2_mode = None
-        self.create_subscription(Go2State, "robot0/go2_states", self._state_callback, 10)
-        
-        self._action_client = ActionServer(self, Survey, 'survey', self._survey_callback, goal_callback=self._goal_callback, cancel_callback=self._cancel_callback)
+        self.create_subscription(
+            Go2State, "robot0/go2_states", self._state_callback, 10
+        )
 
-        self._sit_client = self.create_client(Empty, 'robot0/sit')
-        self._stand_client = self.create_client(Empty, 'robot0/stand')
+        self._action_client = ActionServer(
+            self,
+            Survey,
+            "survey",
+            self._survey_callback,
+            goal_callback=self._goal_callback,
+            cancel_callback=self._cancel_callback,
+        )
+
+        self._sit_client = self.create_client(Empty, "robot0/sit")
+        self._stand_client = self.create_client(Empty, "robot0/stand")
 
     def _state_callback(self, msg):
         self._go2_mode = msg.mode
 
     def _goal_callback(self, goal_request):
-        self.get_logger().info('Received goal request.')
+        self.get_logger().info("Received goal request.")
         return GoalResponse.ACCEPT
 
     def _cancel_callback(self, cancel_request):
-        self.get_logger().info('Received cancel request.')
+        self.get_logger().info("Received cancel request.")
         return CancelResponse.ACCEPT
 
     def _survey_callback(self, goal_handle):
-        path_msg = self._mission_planner.get_survey_path(
-            self._tf_buffer, self._current_position
-        )
+        path_msg, sample_time = self._parse_survey_request(goal_handle.request)
         self._path_publisher.publish(path_msg)
-        
-        #self._sit_client.call_async(Empty.Request())
-        #time.sleep(2)
-        #self._stand_client.call_async(Empty.Request())
-        #time.sleep(2)
 
-        for pose in path_msg.poses[1:]:            
-            if goal_handle.is_cancel_requested:
-                break
-
-            self._navigator.goToPose(pose)
-            while not self._navigator.isTaskComplete() and not goal_handle.is_cancel_requested:
-                self._tick()
-
-            self.get_logger().info('RECORDING MEASUREMENT')
-
-            time.sleep(3)
-            self._sit_client.call_async(Empty.Request())
-            self.get_logger().info('Sent sit cmd')
-                
+        for pose in path_msg.poses[1:]:
+            self._navigate_to_pose(goal_handle, pose)
             
-            dwell_start = time.time()
-            while time.time() - dwell_start < DWELL_TIME and not goal_handle.is_cancel_requested:
-                self._tick()
+            if goal_handle.is_cancel_requested:
+                self._navigator.cancelTask()
+                goal_handle.canceled()
+                self.get_logger().info("Cancelling action...")
+                return Survey.Result()
 
-            self._stand_client.call_async(Empty.Request())
-            self.get_logger().info('Sent stand cmd')
-            time.sleep(3)
+            self._perform_sample(sample_time)
                 
-        if goal_handle.is_cancel_requested:
-            self._navigator.cancelTask()
-            goal_handle.canceled()
-            print("canceled")
-        else:
-            print("wps completed successfully")
-
         return Survey.Result()
+
+    def _navigate_to_pase(self, goal_handle, pose):
+        self._navigator.goToPose(pose)
+        while (
+                not self._navigator.isTaskComplete()
+                and not goal_handle.is_cancel_requested
+        ):
+            self._tick()
+
+    def _perform_sample(self, sample_time):
+        self.get_logger().info("Taking sample")        
+        time.sleep(3)
+        self._sit_client.call_async(Empty.Request())
+        self.get_logger().info("Sent sit cmd")        
+        dwell_start = time.time()
+        while (
+                time.time() - dwell_start < sample_time
+        ):
+            self._tick()
+            
+        self._stand_client.call_async(Empty.Request())
+        self.get_logger().info("Sent stand cmd")
+        time.sleep(3)
+
+    def _parse_survey_request(self, request):
+        vertices = [
+            Point(x=x, y=y, z=0.0) for x, y in zip(request.eastings, request.northings)
+        ]
+        mission_planner = survey_mission_planner.SurveyMissionPlanner(
+            vertices, request.grid_spacing, request.offset, request.north_aligned
+        )
+        path_msg = mission_planner.get_survey_path(self._tf_buffer, self._current_position)
+        return path_msg, request.sample_time
 
     def _tick(self):
         self._publish_area_poly()
@@ -124,11 +134,6 @@ class CO2SurveyNode(Node):
         print(success)
         print(self._tf_buffer.all_frames_as_string())
         return success
-
-    def _publish_area_poly(self):        
-        poly_msg = self._mission_planner.get_survey_area_polygon(self._tf_buffer)
-        self._poly_publisher.publish(poly_msg)
-
 
     @property
     def _current_position(self):
@@ -152,7 +157,6 @@ def main(args=None):
     node = CO2SurveyNode(default_yaml_file_path)
     rclpy.spin(node)
     node.start_survey()
-    
 
     node.destroy_node()
     rclpy.shutdown()

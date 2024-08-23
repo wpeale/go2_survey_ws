@@ -3,21 +3,21 @@ import shapely.geometry as sg
 
 
 def generate_survey_path(
-    survey_area, robot_position, grid_spacing=1, offset=1, alignment_dir="north"
+    survey_area, robot_position, grid_spacing=1.0, offset=0.0, north_aligned=True
 ):
     survey_points = _generate_survey_points(
-        survey_area, grid_spacing, offset, alignment_dir
+        survey_area, grid_spacing, offset, north_aligned
     )
-    start_point = _get_start_point(survey_points, robot_position, alignment_dir)
+    start_point = _get_start_point(survey_points, robot_position, north_aligned)
     current_point = start_point
     route = [robot_position, start_point]
 
-    if alignment_dir == "north":
+    if north_aligned:
         alignment_metric = lambda a, b: abs(b[0] - a[0])
     else:
         alignment_metric = lambda a, b: abs(b[1] - a[1])
 
-    if alignment_dir == "north":
+    if north_aligned:
         row_dist = (
             lambda a, b: -np.sign(a[1] - route[-2][1]) * (b[1] - a[1])
             if a[0] != b[0]
@@ -42,11 +42,11 @@ def generate_survey_path(
     return route
 
 
-def _generate_survey_points(survey_area, grid_spacing, offset, alignment_dir):
+def _generate_survey_points(survey_area, grid_spacing, offset, north_aligned):
     area_poly = sg.Polygon(survey_area)
     minx, miny, maxx, maxy = area_poly.bounds
 
-    if alignment_dir == "north":
+    if north_aligned:
         x = np.arange(minx + offset, maxx, grid_spacing)
         y = np.arange(miny, maxy, grid_spacing)
     else:
@@ -60,8 +60,8 @@ def _generate_survey_points(survey_area, grid_spacing, offset, alignment_dir):
     return pruned_pts
 
 
-def _get_start_point(survey_points, robot_position, alignment_dir):
-    if alignment_dir == "north":
+def _get_start_point(survey_points, robot_position, north_aligned):
+    if north_aligned:
         row_coord = lambda pt: pt[0]
         col_coord = lambda pt: pt[1]
     else:

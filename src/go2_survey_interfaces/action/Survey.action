@@ -1,2 +1,8 @@
+float32[] eastings
+float32[] northings
+float32 grid_spacing
+float32 offset
+bool north_aligned
+float32 sample_time
 ---
 ---
