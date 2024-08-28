@@ -24,6 +24,13 @@ class SurveyClient(Node):
         req = SetBool.Request()
         req.data = True
         self._record_client.call_async(req)
+
+    def stop_recording(self):
+        self.get_logger().info('Stopping recording')
+        req = SetBool.Request()
+        req.data = False
+        self._record_client.call_async(req)
+
         
     def send_goal(self):
         goal_msg = Survey.Goal()
@@ -88,16 +95,14 @@ def main(args=None):
         node.cancel_goal()
         rclpy.shutdown()
 
-    signal.signal(signal.SIGINT, signal_handler)
-
-    executor = MultiThreadedExecutor()
-    executor.add_node(node)
-    try:
-        executor.spin()
-    finally:
-        executor.shutdown()
-        node.destroy_node()
-        rclpy.shutdown()
+    while True:
+        try:
+            rclpy.spin_once(node)
+        except KeyboardInterrupt:
+            node.stop_recording()
+            node.cancel_goal()
+            node.destroy_node()
+            rclpy.shutdown()
         
 if __name__ == '__main__':
     main()

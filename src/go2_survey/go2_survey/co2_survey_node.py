@@ -89,7 +89,7 @@ class CO2SurveyNode(Node):
                 
         return Survey.Result()
 
-    def _navigate_to_pase(self, goal_handle, pose):
+    def _navigate_to_pose(self, goal_handle, pose):
         self._navigator.goToPose(pose)
         while (
                 not self._navigator.isTaskComplete()
@@ -123,7 +123,6 @@ class CO2SurveyNode(Node):
         return path_msg, request.sample_time
 
     def _tick(self):
-        self._publish_area_poly()
         time.sleep(0.1)
 
     def _wait_for_map_trans(self):

@@ -10,6 +10,7 @@ def generate_survey_path(
     )
     start_point = _get_start_point(survey_points, robot_position, north_aligned)
     current_point = start_point
+    survey_points.remove(start_point)
     route = [robot_position, start_point]
 
     if north_aligned:
